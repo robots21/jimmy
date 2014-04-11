@@ -1,0 +1,6 @@
+<launch>
+
+<node name="$(anon foo)" pkg="jimmy" type="jimmy_servos" />
+<node name="$(anon foo)" pkg="jimmy" type="testspeak.py" />
+<node name="$(anon foo)" pkg="jimmy" type="idle.py" />
+</launch>

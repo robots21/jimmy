@@ -1,0 +1,18 @@
+<package>
+  <description brief="jimmy">
+
+     jimmy
+
+  </description>
+  <author>sfeng</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/jimmy</url>
+  
+  <depend package="rospy"/>
+  <depend package="roscpp"/>
+  <depend package="roslib"/>
+
+</package>
+
+

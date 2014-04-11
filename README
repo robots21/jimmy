@@ -1,0 +1,93 @@
+1. Overview:
+We decompose the motion control problem into two parts, a high level 
+controller that generates trajectories for specific body parts in the Cartesian
+space, e.g. move foot or hand around, and a low level controller that solves 
+Inverse Kinematics (IK) to compute all the joint trajectories that best fit the 
+high level controller's goal. Since the low level controller is generic, this 
+approach facilitates fast development for multiple behaviors. We used the same
+low level controller for both walking and gesturing, as they only differ in
+the high level controller. Due to limited communication bandwidth with the 
+servos, we are do not use any feedback. Perfect servo tracking is assumed. 
+
+1.1 Inverse Kinematics:
+Different from most IK approaches that solve joint positions for the entire 
+trajectory a priori, we solve for joint velocity on each tick and then 
+integrate to get joint positions. This way, we can will get smooth joint 
+trajectories. It also responds fast, and allows the high level controller to 
+change objectives midway through a motion. We formulate the IK problem as a
+Quadratic Programming problem, which minimizes a quadratic cost subject to 
+linear constraints. The unknown for QP consists of all the joint velocities 
+(20, without the neck joints) and six velocities for the floating pelvis (qdot). 
+The quadratic cost mostly penalizes center of mass, hand, foot or individual 
+joints velocities from the desired values given by the high level controller. 
+Joint limits are treated as joint limits. On every tick, we solve this QP to 
+get a new qdot, and use it to integrate to get a new position (q) for all the 
+joint position and pelvis position and orientation. The joint positions are 
+passed to the servo as targets.
+
+1.2 Walking:
+The operator will specify forward and turning velocities for walking, and the 
+high level controller will generate a sequence of foot steps which are then 
+used to generate swing foot and Center of Mass (COM) trajectories. These 
+trajectories are computed using a Linear Inverted Pendulum (LIPM) model, which 
+is a common approach for flat floor static walking. These trajectories are then
+passed to inverse kinematics. 
+
+1.3 Gesturing:
+In gesturing mode, the high level controller generates trajectories by a 
+quintic spline with the current states and stored desired states as knot
+points. The user have control over all 8 arm joints, torso orientation (RPY), 
+pelvis position relative the to the middle of the foot (XYZ) and 3 neck joints. 
+IK will compute the leg joints, using pelvis position and torso orientation 
+instead of leg joints makes scripting / puppetry easier. 
+
+1.4 Scripting / puppetry
+You can run bin/test_puppet to start puppetry. The arms and neck are loose.
+After you pose the robot, hit Enter to save all the current joint positions in
+a file in conf/puppet. The positions are appended to the end of the file. The
+order of joints: 6 left leg, 6 right leg, 4 left arm, 4 right arm, 3 neck. 
+For specific joint, check include/jimmy/JimmyCommon.h under Joint. For the 3 
+letter encoding, the last 2 stands for the type of joint. FE is pitch, Z is yaw, 
+AA is roll, where X axis points forward, Y points to the left, and Z points up.
+The first letter encodes which joint, H for hip, K for knee, A for ankle, S for
+shoulder, E for elbow. 
+
+1.5 Servo communication
+We use USB2Dynamixel usb adaptor to talk to the servos. The servo supports sync 
+write instruction but not sync read, which means we can write to a large number 
+of servos in 1 big packet (fast), but have to sequentially query individual
+servo for feedback (slow). The current implementation writes target position to 
+all servos at 100 Hz, but only reads encoders from 2 servos in a round robin 
+way. 
+
+2. config files format. 
+conf/
+  IK.cf: weights for IK
+  plan.cf: parameters for walking, i.e. swing length, step size etc
+  poses.cf: pose file. Each line specifies a desired pose. 
+            First 8 numbers are arm joint angles. 
+            Next 3 are torso RPY.
+            Next 3 are pelvis position (XYZ) relative to the middle of 
+              the feet.
+            Next 3 head angles. 
+  gestures.cf: Each line represents a gesture, which is a list of two 
+            numbers. This first number is the index to the line number in 
+            poses.cf (0 index), and the second number is the length in 
+            seconds. 
+  puppet: temp file that stores the logged joint positions when in puppetry 
+          mode. 
+
+3 ROS messages
+The message definition is in msg/jimmy_command.msg
+The message has 1 int for its type, and variable number of doubles parameters 
+that are used for neck motion or steering walking. 
+
+
+4. Examples
+4.1 bin/test_puppet 
+For puppetry. Press Enter to save a pose.
+
+4.2 bin/test_jimmy 
+Main code. Starts the robot in standing mode. The user can send ROS messages
+to change mode or give commands. 
+
